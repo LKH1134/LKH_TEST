@@ -7,7 +7,7 @@ const TOP_N = 5;
 
 const app = document.querySelector("#app");
 
-/** @type {"idle" | "waiting" | "ready" | "fail" | "result"} */
+/** @type {"idle" | "leaderboard" | "waiting" | "ready" | "fail" | "result"} */
 let phase = "idle";
 let waitTimerId = null;
 let readyAt = 0;
@@ -49,10 +49,25 @@ async function handleSuccess() {
   render();
 }
 
+async function showLeaderboard() {
+  phase = "leaderboard";
+  ranking = [];
+  render();
+  try {
+    ranking = await getTop(TOP_N);
+  } catch (err) {
+    console.error("랭킹을 불러오지 못했습니다.", err);
+  }
+  render();
+}
+
+function backToIdle() {
+  phase = "idle";
+  render();
+}
+
 function handleScreenClick() {
-  if (phase === "idle") {
-    startGame();
-  } else if (phase === "waiting") {
+  if (phase === "waiting") {
     handleFail();
   } else if (phase === "ready") {
     handleSuccess();
@@ -100,11 +115,54 @@ function render() {
   screen.addEventListener("click", handleScreenClick);
 
   if (phase === "idle") {
+    screen.removeEventListener("click", handleScreenClick);
+
     const title = document.createElement("h1");
     title.textContent = "반응속도 측정기";
     const desc = document.createElement("p");
-    desc.textContent = "화면을 클릭하면 게임이 시작됩니다.";
-    screen.append(title, desc);
+    desc.textContent = "시작 버튼을 누르면 게임이 시작됩니다.";
+
+    const buttonRow = document.createElement("div");
+    buttonRow.className = "idle-buttons";
+
+    const startButton = document.createElement("button");
+    startButton.className = "primary-button";
+    startButton.textContent = "시작";
+    startButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      startGame();
+    });
+
+    const leaderboardButton = document.createElement("button");
+    leaderboardButton.className = "secondary-button";
+    leaderboardButton.textContent = "리더보드 보기";
+    leaderboardButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showLeaderboard();
+    });
+
+    buttonRow.append(startButton, leaderboardButton);
+    screen.append(title, desc, buttonRow);
+  } else if (phase === "leaderboard") {
+    screen.removeEventListener("click", handleScreenClick);
+
+    const title = document.createElement("h1");
+    title.textContent = `최고 기록 TOP ${TOP_N}`;
+
+    const rankingEl = document.createElement("div");
+    rankingEl.className = "ranking";
+    const list = document.createElement("ol");
+    rankingEl.append(list);
+
+    const backButton = document.createElement("button");
+    backButton.className = "retry-button";
+    backButton.textContent = "뒤로가기";
+    backButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      backToIdle();
+    });
+
+    screen.append(title, rankingEl, backButton);
   } else if (phase === "waiting") {
     const title = document.createElement("h1");
     title.textContent = "빨간색으로 바뀔 때까지 기다리세요";
@@ -177,7 +235,7 @@ function render() {
 
   app.append(screen);
 
-  if (phase === "result") {
+  if (phase === "result" || phase === "leaderboard") {
     renderRanking();
   }
 }
